@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Event Tracker</title>
+<meta name="theme-color" content="#3B82F6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Events">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  :root{
+    --blue:#3B82F6; --red:#EF4444; --purple:#9333EA; --yellow:#F59E0B; --green:#10B981;
+    --bg:#F2F2F7; --card:#FFFFFF; --text:#1C1C1E; --secondary:#8E8E93; --border:#E5E5EA;
+    --tab-bg: rgba(255,255,255,0.94);
+  }
+  .dark{
+    --bg:#000000; --card:#1C1C1E; --text:#F2F2F7; --secondary:#98989F; --border:#38383A;
+    --tab-bg: rgba(28,28,30,0.94);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
+    background:var(--bg); color:var(--text); overscroll-behavior:none;
+    padding-top: env(safe-area-inset-top);
+  }
+  #app{ max-width:600px; margin:0 auto; height:100vh; display:flex; flex-direction:column; }
+  .screen{ flex:1; overflow-y:auto; padding-bottom: calc(72px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling:touch;}
+  .screen.hidden{ display:none; }
+
+  /* Top nav bar (Home) */
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 16px 4px; }
+  .filter-row{ display:flex; gap:14px; }
+  .filter-btn{
+    width:34px; height:34px; border-radius:50%; border:none; display:flex; align-items:center; justify-content:center;
+    font-size:16px; background:rgba(142,142,147,0.12); color:var(--secondary); cursor:pointer;
+  }
+  .filter-btn.active{ color:#fff; }
+  .filter-btn.active.birthday{ background:var(--blue); }
+  .filter-btn.active.anniversary{ background:var(--red); }
+  .filter-btn.active.custom{ background:var(--yellow); }
+  .icon-btn{ background:none; border:none; font-size:20px; color:var(--blue); cursor:pointer; padding:6px; }
+  .icon-actions{ display:flex; gap:14px; }
+
+  .search-bar{ display:flex; align-items:center; gap:8px; margin:0 16px 8px; background:rgba(142,142,147,0.12); border-radius:10px; padding:8px 10px;}
+  .search-bar input{ border:none; background:none; outline:none; flex:1; font-size:15px; color:var(--text);}
+  .search-bar span{ color:var(--secondary); }
+
+  .section-header{ display:flex; align-items:center; gap:6px; padding:14px 16px 4px; }
+  .section-header .line{ flex:1; height:1px; background:var(--border); }
+  .section-header .label{ font-size:11px; font-weight:700; letter-spacing:0.5px; color:var(--blue); text-transform:uppercase; white-space:nowrap; }
+
+  .event-row{ display:flex; align-items:center; gap:12px; padding:8px 16px; cursor:pointer; }
+  .avatar{ position:relative; width:50px; height:50px; flex-shrink:0; }
+  .avatar-photo{ width:50px; height:50px; border-radius:50%; object-fit:cover; display:block; }
+  .avatar-fallback{ width:50px; height:50px; border-radius:50%; background:rgba(142,142,147,0.18); display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:600; color:var(--blue); }
+  .avatar-badge{ position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; box-shadow:0 0 0 2px var(--bg); }
+  .badge-birthday{ background:var(--blue); }
+  .badge-anniversary{ background:var(--red); }
+  .badge-custom{ background:var(--purple); }
+
+  .event-main{ flex:1; min-width:0; }
+  .event-name{ font-size:16px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .event-sub{ font-size:14px; color:var(--secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .event-days{ text-align:right; width:50px; flex-shrink:0; }
+  .event-days .num{ font-size:18px; font-weight:500; }
+  .event-days .lbl{ font-size:11px; color:var(--secondary); }
+
+  .swipe-wrap{ position:relative; overflow:hidden; }
+  .swipe-actions{ position:absolute; right:0; top:0; height:100%; display:flex; }
+  .swipe-actions button{ border:none; color:#fff; width:64px; font-size:13px; font-weight:500; }
+  .swipe-actions .edit{ background:var(--blue); }
+  .swipe-actions .delete{ background:var(--red); }
+
+  .empty-state{ display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; color:var(--secondary); text-align:center; gap:10px; }
+  .empty-state .glyph{ font-size:40px; opacity:0.6; }
+
+  /* Calendar */
+  .cal-header{ display:flex; align-items:center; justify-content:space-between; padding:8px 16px; }
+  .cal-header button{ background:none; border:none; font-size:20px; color:var(--blue); }
+  .cal-title{ font-size:17px; font-weight:700; }
+  .today-btn{ font-size:14px; color:var(--blue); background:none; border:none; font-weight:600; }
+  .weekday-row{ display:grid; grid-template-columns:repeat(7,1fr); padding:4px 8px; }
+  .weekday-row div{ text-align:center; color:var(--secondary); font-size:12px; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); padding:0 8px; }
+  .cal-cell{ position:relative; aspect-ratio:0.8; border:0.5px solid var(--border); padding:2px; overflow:hidden; cursor:pointer; }
+  .cal-cell.selected{ background:rgba(59,130,246,0.15); }
+  .cal-cell .daynum{ font-size:13px; text-align:center; }
+  .cal-cell.selected .daynum{ color:var(--blue); font-weight:700; }
+  .cal-cell .ev{ font-size:8px; line-height:1.2; color:var(--secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; gap:1px; align-items:center;}
+  .cal-cell .more{ font-size:7px; color:var(--secondary); text-align:center; }
+  .cal-events-title{ font-size:16px; font-weight:700; padding:14px 16px 6px; }
+  .cal-event-card{ display:flex; align-items:center; gap:12px; background:rgba(142,142,147,0.08); border-radius:12px; padding:12px; margin:8px 16px; }
+  .cal-event-card .name{ font-size:14px; font-weight:700; }
+  .cal-event-card .meta{ font-size:12px; color:var(--secondary); }
+  .cal-event-card .days{ text-align:center; }
+  .cal-event-card .days .n{ font-weight:700; color:var(--blue); font-size:16px; }
+  .cal-event-card .days .l{ font-size:10px; color:var(--secondary); }
+
+  /* Timeline */
+  .decade-header{ font-size:15px; font-weight:700; color:var(--green); padding:14px 16px 4px; }
+  .tl-row{ display:flex; align-items:center; gap:8px; padding:8px 16px; cursor:pointer; }
+  .tl-row .icon{ width:20px; text-align:center; }
+  .tl-row .date{ width:90px; font-size:14px; flex-shrink:0; }
+  .tl-row .name{ flex:1; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tl-row .age{ font-size:14px; color:var(--secondary); width:70px; text-align:right; flex-shrink:0; }
+
+  /* Settings */
+  .settings-title{ font-size:28px; font-weight:700; padding:16px; }
+  .settings-section-label{ font-size:13px; color:var(--secondary); padding:16px 16px 6px; text-transform:uppercase; }
+  .settings-list{ background:var(--card); border-radius:10px; margin:0 16px; overflow:hidden; }
+  .settings-row{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:0.5px solid var(--border); cursor:pointer; }
+  .settings-row:last-child{ border-bottom:none; }
+  .settings-row .chev{ margin-left:auto; color:var(--secondary); }
+  .settings-row.destructive{ color:var(--red); }
+  .switch{ margin-left:auto; position:relative; width:48px; height:28px; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider{ position:absolute; inset:0; background:var(--border); border-radius:14px; transition:.2s; cursor:pointer; }
+  .slider:before{ content:""; position:absolute; height:24px; width:24px; left:2px; top:2px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  input:checked + .slider{ background:var(--green); }
+  input:checked + .slider:before{ transform:translateX(20px); }
+
+  /* Tab bar */
+  .tabbar{
+    position:fixed; left:0; right:0; bottom:0; max-width:600px; margin:0 auto;
+    background:var(--tab-bg); backdrop-filter:blur(20px); border-top:0.5px solid var(--border);
+    display:flex; padding-bottom:env(safe-area-inset-bottom);
+  }
+  .tab{ flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 0 6px; background:none; border:none; color:var(--secondary); cursor:pointer; }
+  .tab.active{ color:var(--blue); }
+  .tab .ti{ font-size:22px; }
+  .tab .tl{ font-size:10px; }
+
+  /* Modal / sheet */
+  .sheet-overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.4); display:flex; align-items:flex-end; z-index:100; }
+  .sheet-overlay.hidden{ display:none; }
+  .sheet{ background:var(--bg); width:100%; max-width:600px; margin:0 auto; max-height:92vh; border-radius:16px 16px 0 0; overflow-y:auto; }
+  .sheet-header{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:0.5px solid var(--border); position:sticky; top:0; background:var(--bg); z-index:2;}
+  .sheet-header button{ background:none; border:none; font-size:16px; color:var(--blue); cursor:pointer; }
+  .sheet-header button.save{ font-weight:700; }
+  .sheet-title{ font-size:16px; font-weight:700; }
+  .sheet-body{ padding:16px; }
+
+  .photo-picker{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:18px; }
+  .photo-circle{ width:100px; height:100px; border-radius:50%; background:rgba(142,142,147,0.18); display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer; }
+  .photo-circle img{ width:100%; height:100%; object-fit:cover; }
+  .photo-circle .plus{ font-size:34px; color:var(--blue); }
+  .photo-picker label{ color:var(--blue); font-size:15px; cursor:pointer; }
+
+  .field-label{ font-size:12px; color:var(--secondary); text-transform:uppercase; margin:14px 0 6px; }
+  .text-input, .date-input, textarea, select{
+    width:100%; border:1px solid var(--border); background:var(--card); color:var(--text);
+    border-radius:10px; padding:12px; font-size:16px; font-family:inherit;
+  }
+  textarea{ resize:vertical; min-height:90px; }
+
+  .type-card{ display:flex; align-items:center; gap:10px; background:var(--card); border-radius:10px; padding:14px; margin-bottom:10px; cursor:pointer; border:1px solid var(--border); }
+  .type-card.disabled{ opacity:0.4; pointer-events:none; }
+  .type-card .lbl{ flex:1; }
+  .type-card .go{ color:var(--blue); font-size:14px; }
+
+  .toggle-row{ display:flex; align-items:center; justify-content:space-between; background:var(--card); border-radius:10px; padding:12px 14px; margin:14px 0; border:1px solid var(--border); }
+
+  .icon-grid{ display:flex; gap:10px; overflow-x:auto; padding:8px 2px; }
+  .icon-choice{ flex-shrink:0; width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; background:rgba(142,142,147,0.15); color:var(--secondary); cursor:pointer; }
+  .icon-choice.selected{ background:var(--blue); color:#fff; }
+
+  .toast{ position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(28,28,30,0.94); color:#fff; padding:12px 18px; border-radius:12px; font-size:14px; max-width:80%; text-align:center; z-index:200; box-shadow:0 4px 14px rgba(0,0,0,0.3); }
+  .toast.hidden{ display:none; }
+
+  .confirm-overlay{ position:fixed; inset:0; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:150; }
+  .confirm-overlay.hidden{ display:none; }
+  .confirm-box{ background:var(--card); border-radius:14px; width:270px; overflow:hidden; text-align:center; }
+  .confirm-box .msg{ padding:20px 16px; font-size:14px; }
+  .confirm-box .msg .t{ font-weight:700; font-size:16px; display:block; margin-bottom:6px; }
+  .confirm-box .actions{ display:flex; border-top:0.5px solid var(--border); }
+  .confirm-box .actions button{ flex:1; padding:12px; border:none; background:none; font-size:15px; color:var(--blue); }
+  .confirm-box .actions button.destructive{ color:var(--red); font-weight:600; }
+  .confirm-box .actions button + button{ border-left:0.5px solid var(--border); }
+
+  #csvFileInput{ display:none; }
+  a.hidden-link{ display:none; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME / PARTY -->
+  <div class="screen" id="screen-home">
+    <div class="topbar">
+      <div class="filter-row">
+        <button class="filter-btn birthday active" id="f-birthday" title="Birthdays">🎂</button>
+        <button class="filter-btn anniversary active" id="f-anniversary" title="Anniversaries">❤️</button>
+        <button class="filter-btn custom active" id="f-custom" title="Custom">⭐</button>
+      </div>
+      <div class="icon-actions">
+        <button class="icon-btn" id="btn-search">🔍</button>
+        <button class="icon-btn" id="btn-add">➕</button>
+      </div>
+    </div>
+    <div class="search-bar" id="search-bar" style="display:none;">
+      <span>🔍</span>
+      <input type="text" id="search-input" placeholder="Search events...">
+      <span id="search-clear" style="cursor:pointer;">✕</span>
+    </div>
+    <div id="home-list"></div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div class="screen hidden" id="screen-calendar">
+    <div class="topbar">
+      <div class="filter-row">
+        <button class="filter-btn birthday active" id="cf-birthday">🎂</button>
+        <button class="filter-btn anniversary active" id="cf-anniversary">❤️</button>
+        <button class="filter-btn custom active" id="cf-custom">⭐</button>
+      </div>
+      <button class="today-btn" id="cal-today">TODAY</button>
+    </div>
+    <div class="cal-header">
+      <button id="cal-prev">‹</button>
+      <div class="cal-title" id="cal-month-label"></div>
+      <button id="cal-next">›</button>
+    </div>
+    <div class="weekday-row"><div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div></div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-events-title" id="cal-events-title"></div>
+    <div id="cal-events-list"></div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="screen hidden" id="screen-timeline">
+    <div class="topbar">
+      <div class="filter-row">
+        <button class="filter-btn birthday active" id="tf-birthday">🎂</button>
+        <button class="filter-btn anniversary active" id="tf-anniversary">❤️</button>
+        <button class="filter-btn custom active" id="tf-custom">⭐</button>
+      </div>
+    </div>
+    <div id="timeline-list"></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="screen hidden" id="screen-settings">
+    <div class="settings-title">Settings</div>
+    <div class="settings-section-label">Appearance</div>
+    <div class="settings-list">
+      <div class="settings-row">
+        <span id="dark-icon">☀️</span><span>Dark Mode</span>
+        <label class="switch"><input type="checkbox" id="dark-toggle"><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="settings-section-label">Data Management</div>
+    <div class="settings-list">
+      <div class="settings-row" id="btn-export-csv">📊<span>Export to CSV</span><span class="chev">›</span></div>
+      <div class="settings-row" id="btn-import-csv">📊<span>Import from CSV</span><span class="chev">›</span></div>
+      <div class="settings-row destructive" id="btn-delete-all">🗑️<span>Delete All Events</span></div>
+    </div>
+    <div class="settings-section-label">App</div>
+    <div class="settings-list">
+      <div class="settings-row" style="cursor:default;">ℹ️<span>Install this app: use your browser's "Add to Home Screen" option</span></div>
+    </div>
+    <input type="file" id="csvFileInput" accept=".csv,text/csv">
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tabbar">
+    <button class="tab active" data-tab="home"><span class="ti">🎉</span><span class="tl">Party</span></button>
+    <button class="tab" data-tab="calendar"><span class="ti">📅</span><span class="tl">Cal</span></button>
+    <button class="tab" data-tab="timeline"><span class="ti">🕐</span><span class="tl">Timeline</span></button>
+    <button class="tab" data-tab="settings"><span class="ti">⚙️</span><span class="tl">Settings</span></button>
+  </div>
+</div>
+
+<!-- ADD/EDIT SHEET -->
+<div class="sheet-overlay hidden" id="event-sheet-overlay">
+  <div class="sheet" id="event-sheet"></div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+<div class="confirm-overlay hidden" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="msg"><span class="t" id="confirm-title"></span><span id="confirm-msg"></span></div>
+    <div class="actions">
+      <button id="confirm-cancel">Cancel</button>
+      <button class="destructive" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
