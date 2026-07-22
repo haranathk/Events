@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,10 +29,14 @@
     padding-top: env(safe-area-inset-top);
   }
   #app{ max-width:600px; margin:0 auto; height:100vh; display:flex; flex-direction:column; }
-  .screen{ flex:1; overflow-y:auto; padding-bottom: calc(72px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling:touch;}
-  .screen.hidden{ display:none; }
 
-  /* Top nav bar (Home) */
+  /* Screen layout: fixed header + scrollable body */
+  .screen{ display:none; flex-direction:column; flex:1; overflow:hidden; }
+  .screen.active{ display:flex; }
+  .screen-header{ flex-shrink:0; }
+  .screen-body{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:8px; }
+
+  /* Top nav bar */
   .topbar{ display:flex; align-items:center; justify-content:space-between; padding:10px 16px 4px; }
   .filter-row{ display:flex; gap:14px; }
   .filter-btn{
@@ -68,7 +73,6 @@
   .event-days{ text-align:right; width:50px; flex-shrink:0; }
   .event-days .num{ font-size:18px; font-weight:500; }
   .event-days .lbl{ font-size:11px; color:var(--secondary); }
-
 
   .empty-state{ display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; color:var(--secondary); text-align:center; gap:10px; }
   .empty-state .glyph{ font-size:40px; opacity:0.6; }
@@ -123,6 +127,7 @@
     position:fixed; left:0; right:0; bottom:0; max-width:600px; margin:0 auto;
     background:var(--tab-bg); backdrop-filter:blur(20px); border-top:0.5px solid var(--border);
     display:flex; padding-bottom:env(safe-area-inset-bottom);
+    z-index:50;
   }
   .tab{ flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 0 6px; background:none; border:none; color:var(--secondary); cursor:pointer; }
   .tab.active{ color:var(--blue); }
@@ -184,80 +189,90 @@
 <div id="app">
 
   <!-- HOME / PARTY -->
-  <div class="screen" id="screen-home">
-    <div class="topbar">
-      <div class="filter-row">
-        <button class="filter-btn birthday active" id="f-birthday" title="Birthdays">🎂</button>
-        <button class="filter-btn anniversary active" id="f-anniversary" title="Anniversaries">❤️</button>
-        <button class="filter-btn custom active" id="f-custom" title="Custom">⭐</button>
+  <div class="screen active" id="screen-home">
+    <div class="screen-header">
+      <div class="topbar">
+        <div class="filter-row">
+          <button class="filter-btn birthday active" id="f-birthday" title="Birthdays">🎂</button>
+          <button class="filter-btn anniversary active" id="f-anniversary" title="Anniversaries">❤️</button>
+          <button class="filter-btn custom active" id="f-custom" title="Custom">⭐</button>
+        </div>
+        <div class="icon-actions">
+          <button class="icon-btn" id="btn-search">🔍</button>
+          <button class="icon-btn" id="btn-add">➕</button>
+        </div>
       </div>
-      <div class="icon-actions">
-        <button class="icon-btn" id="btn-search">🔍</button>
-        <button class="icon-btn" id="btn-add">➕</button>
+      <div class="search-bar" id="search-bar" style="display:none;">
+        <span>🔍</span>
+        <input type="text" id="search-input" placeholder="Search events...">
+        <span id="search-clear" style="cursor:pointer;">✕</span>
       </div>
     </div>
-    <div class="search-bar" id="search-bar" style="display:none;">
-      <span>🔍</span>
-      <input type="text" id="search-input" placeholder="Search events...">
-      <span id="search-clear" style="cursor:pointer;">✕</span>
-    </div>
-    <div id="home-list"></div>
+    <div class="screen-body" id="home-list"></div>
   </div>
 
   <!-- CALENDAR -->
-  <div class="screen hidden" id="screen-calendar">
-    <div class="topbar">
-      <div class="filter-row">
-        <button class="filter-btn birthday active" id="cf-birthday">🎂</button>
-        <button class="filter-btn anniversary active" id="cf-anniversary">❤️</button>
-        <button class="filter-btn custom active" id="cf-custom">⭐</button>
+  <div class="screen" id="screen-calendar">
+    <div class="screen-header">
+      <div class="topbar">
+        <div class="filter-row">
+          <button class="filter-btn birthday active" id="cf-birthday">🎂</button>
+          <button class="filter-btn anniversary active" id="cf-anniversary">❤️</button>
+          <button class="filter-btn custom active" id="cf-custom">⭐</button>
+        </div>
+        <button class="today-btn" id="cal-today">TODAY</button>
       </div>
-      <button class="today-btn" id="cal-today">TODAY</button>
+      <div class="cal-header">
+        <button id="cal-prev">‹</button>
+        <div class="cal-title" id="cal-month-label"></div>
+        <button id="cal-next">›</button>
+      </div>
+      <div class="weekday-row"><div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div></div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-events-title" id="cal-events-title"></div>
     </div>
-    <div class="cal-header">
-      <button id="cal-prev">‹</button>
-      <div class="cal-title" id="cal-month-label"></div>
-      <button id="cal-next">›</button>
-    </div>
-    <div class="weekday-row"><div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div></div>
-    <div class="cal-grid" id="cal-grid"></div>
-    <div class="cal-events-title" id="cal-events-title"></div>
-    <div id="cal-events-list"></div>
+    <div class="screen-body" id="cal-events-list"></div>
   </div>
 
   <!-- TIMELINE -->
-  <div class="screen hidden" id="screen-timeline">
-    <div class="topbar">
-      <div class="filter-row">
-        <button class="filter-btn birthday active" id="tf-birthday">🎂</button>
-        <button class="filter-btn anniversary active" id="tf-anniversary">❤️</button>
-        <button class="filter-btn custom active" id="tf-custom">⭐</button>
+  <div class="screen" id="screen-timeline">
+    <div class="screen-header">
+      <div class="topbar">
+        <div class="filter-row">
+          <button class="filter-btn birthday active" id="tf-birthday">🎂</button>
+          <button class="filter-btn anniversary active" id="tf-anniversary">❤️</button>
+          <button class="filter-btn custom active" id="tf-custom">⭐</button>
+        </div>
       </div>
     </div>
-    <div id="timeline-list"></div>
+    <div class="screen-body" id="timeline-list"></div>
   </div>
 
   <!-- SETTINGS -->
-  <div class="screen hidden" id="screen-settings">
-    <div class="settings-title">Settings</div>
-    <div class="settings-section-label">Appearance</div>
-    <div class="settings-list">
-      <div class="settings-row">
-        <span id="dark-icon">☀️</span><span>Dark Mode</span>
-        <label class="switch"><input type="checkbox" id="dark-toggle"><span class="slider"></span></label>
+  <div class="screen" id="screen-settings">
+    <div class="screen-header">
+      <div class="settings-title">Settings</div>
+    </div>
+    <div class="screen-body">
+      <div class="settings-section-label">Appearance</div>
+      <div class="settings-list">
+        <div class="settings-row">
+          <span id="dark-icon">☀️</span><span>Dark Mode</span>
+          <label class="switch"><input type="checkbox" id="dark-toggle"><span class="slider"></span></label>
+        </div>
       </div>
+      <div class="settings-section-label">Data Management</div>
+      <div class="settings-list">
+        <div class="settings-row" id="btn-export-csv">📊<span>Export to CSV</span><span class="chev">›</span></div>
+        <div class="settings-row" id="btn-import-csv">📊<span>Import from CSV</span><span class="chev">›</span></div>
+        <div class="settings-row destructive" id="btn-delete-all">🗑️<span>Delete All Events</span></div>
+      </div>
+      <div class="settings-section-label">App</div>
+      <div class="settings-list">
+        <div class="settings-row" style="cursor:default;">ℹ️<span>Install this app: use your browser's "Add to Home Screen" option</span></div>
+      </div>
+      <input type="file" id="csvFileInput" accept=".csv,text/csv">
     </div>
-    <div class="settings-section-label">Data Management</div>
-    <div class="settings-list">
-      <div class="settings-row" id="btn-export-csv">📊<span>Export to CSV</span><span class="chev">›</span></div>
-      <div class="settings-row" id="btn-import-csv">📊<span>Import from CSV</span><span class="chev">›</span></div>
-      <div class="settings-row destructive" id="btn-delete-all">🗑️<span>Delete All Events</span></div>
-    </div>
-    <div class="settings-section-label">App</div>
-    <div class="settings-list">
-      <div class="settings-row" style="cursor:default;">ℹ️<span>Install this app: use your browser's "Add to Home Screen" option</span></div>
-    </div>
-    <input type="file" id="csvFileInput" accept=".csv,text/csv">
   </div>
 
   <!-- TAB BAR -->
