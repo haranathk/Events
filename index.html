@@ -70,8 +70,12 @@
   .event-days .lbl{ font-size:11px; color:var(--secondary); }
 
   .swipe-wrap{ position:relative; overflow:hidden; }
-  .swipe-actions{ position:absolute; right:0; top:0; height:100%; display:flex; }
-  .swipe-actions button{ border:none; color:#fff; width:64px; font-size:13px; font-weight:500; }
+  .swipe-actions{ position:absolute; right:8px; top:0; height:100%; display:flex; align-items:center; gap:8px; }
+  .swipe-actions button{
+    border:none; color:#fff; width:40px; height:40px; border-radius:50%;
+    font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    box-shadow:0 1px 4px rgba(0,0,0,0.15);
+  }
   .swipe-actions .edit{ background:var(--blue); }
   .swipe-actions .delete{ background:var(--red); }
 
