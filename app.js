@@ -249,8 +249,6 @@
     return sections;
   }
 
-  let swipeOpenRow = null;
-
   function renderHome() {
     const list = homeFilteredEvents();
     const sections = groupHomeEvents(list);
@@ -271,7 +269,6 @@
       html += `<div class="section-header"><div class="line"></div><div class="label">${escapeHtml(label)}</div><div class="line"></div></div>`;
       items.forEach(({ ev, daysUntil }) => {
         html += `
-        <div class="swipe-wrap" data-id="${ev.id}">
           <div class="event-row" data-open-edit="${ev.id}">
             <div class="avatar">
               ${avatarHtml(ev)}
@@ -282,101 +279,14 @@
               <div class="event-sub">${escapeHtml(eventInfoLine(ev, daysUntil, showDays))}</div>
             </div>
             ${showDays ? `<div class="event-days"><div class="num">${Math.abs(daysUntil)}</div><div class="lbl">days</div></div>` : ""}
-          </div>
-          <div class="swipe-actions">
-            <button class="edit" data-open-edit="${ev.id}" title="Edit">✏️</button>
-            <button class="delete" data-delete="${ev.id}" title="Delete">🗑️</button>
-          </div>
-        </div>`;
+          </div>`;
       });
     });
     container.innerHTML = html;
 
-    // swipe-to-reveal (simple touch handling)
-    const REVEAL_PX = 96;
-    container.querySelectorAll(".swipe-wrap").forEach((wrap) => {
-      let startX = 0, startY = 0, currentX = 0, dragging = false, decided = false, horizontal = false;
-      const row = wrap.querySelector(".event-row");
-      row.style.transition = "transform 0.18s ease";
-      wrap.addEventListener("touchstart", (e) => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        dragging = true; decided = false; horizontal = false;
-        row.style.transition = "none";
-        // closing any other open row first
-        if (swipeOpenRow && swipeOpenRow !== row) {
-          swipeOpenRow.style.transition = "transform 0.18s ease";
-          swipeOpenRow.style.transform = "translateX(0)";
-          swipeOpenRow = null;
-        }
-      }, { passive: true });
-      wrap.addEventListener("touchmove", (e) => {
-        if (!dragging) return;
-        const dx = e.touches[0].clientX - startX;
-        const dy = e.touches[0].clientY - startY;
-        if (!decided) {
-          decided = true;
-          horizontal = Math.abs(dx) > Math.abs(dy);
-        }
-        if (!horizontal) return;
-        currentX = dx;
-        const base = row.dataset.open === "1" ? -REVEAL_PX : 0;
-        const total = Math.min(0, Math.max(base + currentX, -REVEAL_PX));
-        row.style.transform = `translateX(${total}px)`;
-      }, { passive: true });
-      wrap.addEventListener("touchend", () => {
-        dragging = false;
-        row.style.transition = "transform 0.18s ease";
-        if (!horizontal) { return; }
-        const wasOpen = row.dataset.open === "1";
-        const finalDx = (wasOpen ? -REVEAL_PX : 0) + currentX;
-        if (finalDx < -REVEAL_PX / 2) {
-          row.style.transform = `translateX(-${REVEAL_PX}px)`;
-          row.dataset.open = "1";
-          swipeOpenRow = row;
-        } else {
-          row.style.transform = "translateX(0)";
-          row.dataset.open = "0";
-          if (swipeOpenRow === row) swipeOpenRow = null;
-        }
-        currentX = 0;
-      });
-    });
-
     container.querySelectorAll("[data-open-edit]").forEach((el) => {
-      el.addEventListener("click", (e) => {
-        const isMainRow = el.classList.contains("event-row");
-        if (isMainRow && swipeOpenRow) {
-          e.stopPropagation();
-          swipeOpenRow.style.transform = "translateX(0)";
-          swipeOpenRow.dataset.open = "0";
-          swipeOpenRow = null;
-          return;
-        }
-        if (swipeOpenRow) { swipeOpenRow.style.transform = "translateX(0)"; swipeOpenRow.dataset.open = "0"; swipeOpenRow = null; }
-        openEventSheet(el.dataset.openEdit);
-      });
+      el.addEventListener("click", () => openEventSheet(el.dataset.openEdit));
     });
-    container.querySelectorAll("[data-delete]").forEach((el) => {
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const ev = state.events.find((x) => x.id === el.dataset.delete);
-        showConfirm("Delete Event", `Delete "${ev ? ev.name : ""}"? This can't be undone.`, "Delete", () => {
-          state.events = state.events.filter((x) => x.id !== el.dataset.delete);
-          saveEvents();
-          renderActive();
-        });
-      });
-    });
-  }
-
-  function closeOpenSwipeOnOutsideClick(e) {
-    if (!swipeOpenRow) return;
-    const openWrap = swipeOpenRow.closest(".swipe-wrap");
-    if (openWrap && openWrap.contains(e.target)) return;
-    swipeOpenRow.style.transform = "translateX(0)";
-    swipeOpenRow.dataset.open = "0";
-    swipeOpenRow = null;
   }
 
   ["birthday", "anniversary", "custom"].forEach((kind) => {
@@ -939,8 +849,6 @@
       navigator.serviceWorker.register("sw.js").catch((e) => console.log("SW registration failed", e));
     });
   }
-
-  document.addEventListener("click", closeOpenSwipeOnOutsideClick, true);
 
   // ---------- Init ----------
   renderHome();
