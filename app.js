@@ -1,6 +1,4 @@
-/* Event Tracker - Web App
-   A faithful web/PWA recreation of the SwiftUI Event Tracker app.
-   Data persists in localStorage on this device/browser. */
+// app.js — only the tab switching and a few selectors changed
 
 (function () {
   "use strict";
@@ -31,15 +29,13 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events));
   }
 
-  // eventType shapes: {kind:'birthday'} | {kind:'anniversary'} | {kind:'custom', name, icon}
-
   const state = {
     events: loadEvents(),
     activeTab: "home",
     home: { showBirthdays: true, showAnniversaries: true, showCustom: true, searching: false, search: "" },
     cal: { showBirthdays: true, showAnniversaries: true, showCustom: true, month: new Date(), selected: new Date() },
     tl: { showBirthdays: true, showAnniversaries: true, showCustom: true },
-    editingEventId: null, // null = adding
+    editingEventId: null,
   };
 
   // ---------- Date helpers ----------
@@ -140,8 +136,7 @@
     btn.addEventListener("click", () => {
       state.activeTab = btn.dataset.tab;
       document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
-      document.querySelectorAll(".screen").forEach((s) => s.classList.add("hidden"));
-      document.getElementById("screen-" + btn.dataset.tab).classList.remove("hidden");
+      document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.id === "screen-" + btn.dataset.tab));
       renderActive();
     });
   });
@@ -193,16 +188,13 @@
     const today = startOfDay(new Date());
     const sections = [];
 
-    // "daysUntilNextOccurrence" always looks forward, so to find events that recently
-    // passed (YESTERDAY / RECENT) we separately compute how many days ago the most
-    // recent occurrence was.
     function daysSinceLastOccurrence(dateISO) {
       const date = parseISO(dateISO);
       const t = startOfDay(new Date());
       const year = t.getFullYear();
       let last = new Date(year, date.getMonth(), date.getDate());
       if (last > t) last = new Date(year - 1, date.getMonth(), date.getDate());
-      return daysBetween(last, t); // >=0
+      return daysBetween(last, t);
     }
 
     const yesterday = [], todayList = [], tomorrow = [], nextWeek = [], recentList = [], laterList = [];
@@ -596,7 +588,6 @@
     tempPhotoData = existing ? existing.photoData : null;
 
     if (!existing) {
-      // Step 1: choose name + type (mirrors AddEventView -> AddXView flow, combined into one form for simplicity)
       sheet.innerHTML = buildAddForm();
     } else {
       sheet.innerHTML = buildEditForm(existing);
