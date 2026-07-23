@@ -1,4 +1,4 @@
-const CACHE_NAME = "event-tracker-v1";
+const CACHE_NAME = "event-tracker-v4"; // bump this string whenever you deploy changes
 const ASSETS = [
   "./",
   "./index.html",
@@ -23,18 +23,17 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Network-first: always try to fetch the latest file from the server first.
+// Only fall back to the cached copy if the network request fails (offline).
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          return response;
-        })
-        .catch(() => cached);
-    })
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

@@ -1,10 +1,16 @@
-// app.js — only the tab switching and a few selectors changed
+/* Event Tracker - Web App
+   A faithful web/PWA recreation of the SwiftUI Event Tracker app.
+   Data persists in IndexedDB on this device/browser, saved automatically
+   after every add/edit/delete — no Save button, no data loss on exit. */
 
 (function () {
   "use strict";
 
-  // ---------- Storage ----------
-  const STORAGE_KEY = "eventTrackerEvents";
+  // ---------- Storage (IndexedDB) ----------
+  const DB_NAME = "EventTrackerDB";
+  const DB_VERSION = 1;
+  const STORE_NAME = "events";
+  const LEGACY_STORAGE_KEY = "eventTrackerEvents"; // old localStorage key, used once for migration only
   const DARK_KEY = "eventTrackerDarkMode";
 
   function uuid() {
@@ -14,28 +20,66 @@
     });
   }
 
-  function loadEvents() {
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: "id" });
+        }
+      };
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  }
+
+  const dbPromise = openDB();
+
+  function loadEventsFromDB() {
+    return dbPromise.then((db) => new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const req = tx.objectStore(STORE_NAME).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    })).catch((e) => { console.error("Failed to load events from IndexedDB", e); return []; });
+  }
+
+  // Persists the full current in-memory events list. Called immediately after
+  // every add/edit/delete — this IS the auto-save, there is no separate Save step.
+  function saveEvents() {
+    return dbPromise.then((db) => new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.clear();
+      state.events.forEach((ev) => store.put(ev));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    })).catch((e) => console.error("Failed to save events to IndexedDB", e));
+  }
+
+  // One-time migration: earlier versions of this app stored events in
+  // localStorage. If IndexedDB is empty but old localStorage data exists,
+  // pull it in automatically so nobody's existing events disappear.
+  function loadLegacyLocalStorageEvents() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
       if (!raw) return [];
-      return JSON.parse(raw);
+      return JSON.parse(raw) || [];
     } catch (e) {
-      console.error("Failed to load events", e);
       return [];
     }
   }
 
-  function saveEvents() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.events));
-  }
+  // eventType shapes: {kind:'birthday'} | {kind:'anniversary'} | {kind:'custom', name, icon}
 
   const state = {
-    events: loadEvents(),
+    events: [], // populated asynchronously from IndexedDB during init, see bottom of file
     activeTab: "home",
     home: { showBirthdays: true, showAnniversaries: true, showCustom: true, searching: false, search: "" },
     cal: { showBirthdays: true, showAnniversaries: true, showCustom: true, month: new Date(), selected: new Date() },
     tl: { showBirthdays: true, showAnniversaries: true, showCustom: true },
-    editingEventId: null,
+    editingEventId: null, // null = adding
   };
 
   // ---------- Date helpers ----------
@@ -136,7 +180,8 @@
     btn.addEventListener("click", () => {
       state.activeTab = btn.dataset.tab;
       document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
-      document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.id === "screen-" + btn.dataset.tab));
+      document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+      document.getElementById("screen-" + btn.dataset.tab).classList.add("active");
       renderActive();
     });
   });
@@ -179,25 +224,28 @@
     if (showDays) {
       if (daysUntil < 0) return `${Math.abs(daysUntil)} days passed • ${date}`;
       if (daysUntil === 0) return `Today • ${date}`;
+      if (daysUntil > 0) return `In ${daysUntil} days • ${date}`;
     }
     const years = yearsSince(ev.date);
     return `Turning ${years + 1} years • ${date}`;
   }
 
   function groupHomeEvents(list) {
-    const today = startOfDay(new Date());
     const sections = [];
 
+    // "daysUntilNextOccurrence" always looks forward, so to find events that recently
+    // passed (YESTERDAY) we separately compute how many days ago the most
+    // recent occurrence was.
     function daysSinceLastOccurrence(dateISO) {
       const date = parseISO(dateISO);
       const t = startOfDay(new Date());
       const year = t.getFullYear();
       let last = new Date(year, date.getMonth(), date.getDate());
       if (last > t) last = new Date(year - 1, date.getMonth(), date.getDate());
-      return daysBetween(last, t);
+      return daysBetween(last, t); // >=0
     }
 
-    const yesterday = [], todayList = [], tomorrow = [], nextWeek = [], recentList = [], laterList = [];
+    const yesterday = [], todayList = [], tomorrow = [], nextWeek = [], laterList = [];
     list.forEach((ev) => {
       const sinceLast = daysSinceLastOccurrence(ev.date);
       const until = daysUntilNextOccurrence(ev.date);
@@ -205,7 +253,7 @@
       if (sinceLast === 0) { todayList.push({ ev, daysUntil: 0 }); return; }
       if (until === 1) { tomorrow.push({ ev, daysUntil: 1 }); return; }
       if (until >= 2 && until <= 7) { nextWeek.push({ ev, daysUntil: until }); return; }
-      if (sinceLast >= 2 && sinceLast <= 7) { recentList.push({ ev, daysUntil: -sinceLast }); return; }
+      if (sinceLast >= 2 && sinceLast <= 7) { laterList.push({ ev, daysUntil: -sinceLast }); return; }
       laterList.push({ ev, daysUntil: until });
     });
 
@@ -215,7 +263,6 @@
       return da.getDate() - db.getDate();
     }
 
-    if (recentList.length) sections.push(["RECENT", recentList.sort((a, b) => b.daysUntil - a.daysUntil)]);
     if (yesterday.length) sections.push(["YESTERDAY", yesterday.sort(sortByMonthDay)]);
     if (todayList.length) sections.push(["TODAY", todayList.sort(sortByMonthDay)]);
     if (tomorrow.length) sections.push(["TOMORROW", tomorrow.sort(sortByMonthDay)]);
@@ -258,16 +305,17 @@
     let html = "";
     sections.forEach(([label, items]) => {
       const showDays = !(label === "YESTERDAY" || label === "TODAY" || label === "TOMORROW");
+      const isToday = label === "TODAY";
       html += `<div class="section-header"><div class="line"></div><div class="label">${escapeHtml(label)}</div><div class="line"></div></div>`;
       items.forEach(({ ev, daysUntil }) => {
         html += `
-          <div class="event-row" data-open-edit="${ev.id}">
+          <div class="event-row ${isToday ? "event-row-today" : ""}" data-open-edit="${ev.id}">
             <div class="avatar">
               ${avatarHtml(ev)}
               <div class="avatar-badge ${eventTypeColorClass(ev.eventType)}">${eventTypeIcon(ev.eventType)}</div>
             </div>
             <div class="event-main">
-              <div class="event-name">${escapeHtml(ev.name)} (${parseISO(ev.date).getFullYear()})</div>
+              <div class="event-name">${escapeHtml(ev.name)} (${parseISO(ev.date).getFullYear()})${isToday ? ' <span class="today-tag">🎉 Today</span>' : ""}</div>
               <div class="event-sub">${escapeHtml(eventInfoLine(ev, daysUntil, showDays))}</div>
             </div>
             ${showDays ? `<div class="event-days"><div class="num">${Math.abs(daysUntil)}</div><div class="lbl">days</div></div>` : ""}
@@ -588,6 +636,7 @@
     tempPhotoData = existing ? existing.photoData : null;
 
     if (!existing) {
+      // Step 1: choose name + type (mirrors AddEventView -> AddXView flow, combined into one form for simplicity)
       sheet.innerHTML = buildAddForm();
     } else {
       sheet.innerHTML = buildEditForm(existing);
@@ -837,12 +886,39 @@
   // ---------- Service worker ----------
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch((e) => console.log("SW registration failed", e));
+      navigator.serviceWorker.register("sw.js").then((reg) => {
+        // Check the server for a newer sw.js every time the app loads.
+        reg.update();
+        reg.addEventListener("updatefound", () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener("statechange", () => {
+            if (newWorker.state === "activated") {
+              // A newer version just took over — reload once so the fresh
+              // index.html/app.js are actually used instead of the old ones
+              // still sitting in memory.
+              window.location.reload();
+            }
+          });
+        });
+      }).catch((e) => console.log("SW registration failed", e));
     });
   }
 
   // ---------- Init ----------
-  renderHome();
-  renderCalendar();
-  renderTimeline();
+  (async function initApp() {
+    let events = await loadEventsFromDB();
+    if (events.length === 0) {
+      const legacy = loadLegacyLocalStorageEvents();
+      if (legacy.length > 0) {
+        events = legacy;
+        state.events = events;
+        await saveEvents(); // migrate into IndexedDB immediately
+      }
+    }
+    state.events = events;
+    renderHome();
+    renderCalendar();
+    renderTimeline();
+  })();
 })();
