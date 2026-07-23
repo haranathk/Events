@@ -249,7 +249,7 @@
       if (sinceLast === 0) { todayList.push({ ev, daysUntil: 0 }); return; }
       if (until === 1) { tomorrow.push({ ev, daysUntil: 1 }); return; }
       if (until >= 2 && until <= 7) { nextWeek.push({ ev, daysUntil: until }); return; }
-      if (sinceLast >= 2 && sinceLast <= 7) { laterList.push({ ev, daysUntil: -sinceLast }); return; }
+      if (sinceLast >= 2 && sinceLast <= 7) { return; } // already passed this month — no longer shown
       laterList.push({ ev, daysUntil: until });
     });
 
