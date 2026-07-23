@@ -1,4 +1,4 @@
-const CACHE_NAME = "event-tracker-v4"; // bump this string whenever you deploy changes
+const CACHE_NAME = "event-tracker-v6"; // bump this string whenever you deploy changes
 const ASSETS = [
   "./",
   "./index.html",

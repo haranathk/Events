@@ -113,6 +113,7 @@
     const monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     if (pattern === "ddMMM") return `${String(d.getDate()).padStart(2, "0")} ${months[d.getMonth()]}`;
+    if (pattern === "ddMM") return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
     if (pattern === "ddMMMyyyy") return `${String(d.getDate()).padStart(2, "0")}-${months[d.getMonth()]}-${d.getFullYear()}`;
     if (pattern === "MMMMyyyy") return `${monthsFull[d.getMonth()]} ${d.getFullYear()}`;
     if (pattern === "long") return `${monthsFull[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
@@ -219,15 +220,10 @@
     return list;
   }
 
-  function eventInfoLine(ev, daysUntil, showDays) {
-    const date = fmtDate(ev.date, "ddMMM") + " • " + weekdayInCurrentYear(ev.date);
-    if (showDays) {
-      if (daysUntil < 0) return `${Math.abs(daysUntil)} days passed • ${date}`;
-      if (daysUntil === 0) return `Today • ${date}`;
-      if (daysUntil > 0) return `In ${daysUntil} days • ${date}`;
-    }
+  function eventInfoLine(ev) {
+    const date = fmtDate(ev.date, "ddMM") + " • " + weekdayInCurrentYear(ev.date);
     const years = yearsSince(ev.date);
-    return `Turning ${years + 1} years • ${date}`;
+    return `Turning ${years + 1} • ${date}`;
   }
 
   function groupHomeEvents(list) {
@@ -316,7 +312,7 @@
             </div>
             <div class="event-main">
               <div class="event-name">${escapeHtml(ev.name)} (${parseISO(ev.date).getFullYear()})${isToday ? ' <span class="today-tag">🎉 Today</span>' : ""}</div>
-              <div class="event-sub">${escapeHtml(eventInfoLine(ev, daysUntil, showDays))}</div>
+              <div class="event-sub">${escapeHtml(eventInfoLine(ev))}</div>
             </div>
             ${showDays ? `<div class="event-days"><div class="num">${Math.abs(daysUntil)}</div><div class="lbl">days</div></div>` : ""}
           </div>`;
@@ -415,7 +411,7 @@
           <div class="avatar">${avatarHtml(ev)}</div>
           <div style="flex:1; min-width:0;">
             <div class="name">${escapeHtml(ev.name)}</div>
-            <div class="meta">Turning ${years + 1} years • ${fmtDate(ev.date, "ddMMM")} • ${weekdayInCurrentYear(ev.date)}</div>
+            <div class="meta">Turning ${years + 1} • ${fmtDate(ev.date, "ddMM")} • ${weekdayInCurrentYear(ev.date)}</div>
           </div>
           <div class="days"><div class="n">${until}</div><div class="l">days</div></div>
         </div>`;
